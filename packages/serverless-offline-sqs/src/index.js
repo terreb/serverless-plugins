@@ -2,8 +2,8 @@ const {join} = require('path');
 const figures = require('figures');
 const SQS = require('aws-sdk/clients/sqs');
 const {mapValues, isEmpty, forEach, map, has, filter, get, pipe} = require('lodash/fp');
-const {createHandler, getFunctionOptions} = require('serverless-offline/src/functionHelper');
-const createLambdaContext = require('serverless-offline/src/createLambdaContext');
+const {createHandler, getFunctionOptions} = require('serverless-offline-python/src/functionHelper');
+const createLambdaContext = require('serverless-offline-python/src/createLambdaContext');
 
 const fromCallback = fun =>
   new Promise((resolve, reject) => {
@@ -96,7 +96,8 @@ class ServerlessOfflineSQS {
 
     const servicePath = join(this.serverless.config.servicePath, location);
 
-    const funOptions = getFunctionOptions(__function, functionName, servicePath);
+    const serviceRuntime = this.service.provider.runtime;
+    const funOptions = getFunctionOptions(__function, functionName, servicePath, serviceRuntime);
     const handler = createHandler(funOptions, Object.assign({}, this.options, this.config));
 
     const lambdaContext = createLambdaContext(__function, (err, data) => {
@@ -129,11 +130,28 @@ class ServerlessOfflineSQS {
       )
     };
 
-    if (handler.length < 3)
-      handler(event, lambdaContext)
-        .then(res => lambdaContext.done(null, res))
-        .catch(lambdaContext.done);
-    else handler(event, lambdaContext, lambdaContext.done);
+    if (handler.length < 3) {
+      // handler(event, lambdaContext)
+      //   .then(res => lambdaContext.done(null, res))
+      //   .catch(lambdaContext.done);
+      try {
+        // TODO: test with Node
+        const x = handler(event, lambdaContext);
+
+        // Promise support
+        if (serviceRuntime === 'nodejs8.10' || serviceRuntime === 'babel') {
+          if (x && typeof x.then === 'function' && typeof x.catch === 'function') {
+            x.then(res => lambdaContext.done(null, res)).catch(lambdaContext.done);
+          } else if (x instanceof Error) {
+            lambdaContext.done(x);
+          }
+        }
+      } catch (error) {
+        lambdaContext.done(error);
+      }
+    } else {
+      handler(event, lambdaContext, lambdaContext.done);
+    }
 
     process.env = env;
   }

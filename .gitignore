@@ -1,5 +1,6 @@
 **/node_modules
 packges/**/packages-lock.json
+package.json.lerna_backup
 
 # Serverless directories
 .serverless
@@ -14,3 +15,6 @@ coverage
 
 # OSX
 .DS_Store
+
+# WebStorm
+.idea
